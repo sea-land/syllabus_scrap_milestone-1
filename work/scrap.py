@@ -324,31 +324,47 @@ def format_syllabus_data(source_path, dest_path):
                 log(f"Error processing row: {row} - {e}", ERROR)
 
 
+def convert_to_utf8_with_bom(source_file, dest_file):
+    with open(source_file, "r", newline="", encoding="utf-8") as source:
+        content = source.read()
+    
+    with open(dest_file, "w", newline="", encoding="utf-8-sig") as dest:
+        dest.write(content)
+
+
 def run():
-    log("==========Scraping started==========")
     set_logger()
+    log("==========Scraping started==========")
     start_time = time.time()
+    
     try:
         check_versions()
         year, month = get_current_date()
-        dest_dir = f"../data/{year}_{month}"
+        base_dir = f"../data/{year}_{month}"
+        mac_dir = os.path.join(base_dir, "forMac")
+        windows_dir = os.path.join(base_dir, "forWindows")
 
-        os.makedirs(dest_dir, exist_ok=True)
+        os.makedirs(mac_dir, exist_ok=True)
+        os.makedirs(windows_dir, exist_ok=True)
 
-        driver=init_driver()
+        driver = init_driver()
     except Exception as e:
         log(f"Error : {e}", ERROR)
+        return
 
     try:
-        scrape_syllabus_data(driver, dest_dir)
+        scrape_syllabus_data(driver, base_dir)
     finally:
         driver.quit()
 
     for faculty in FACULTIES:
         log(f"Formatting {faculty} data.")
-        source_file = os.path.join(dest_dir, f"raw_syllabus_data_{faculty}.csv")
-        dest_file = os.path.join(dest_dir, f"syllabus_data_{faculty}.csv")
-        format_syllabus_data(source_file, dest_file)
+        source_file = os.path.join(base_dir, f"raw_syllabus_data_{faculty}.csv")
+        mac_file = os.path.join(mac_dir, f"syllabus_data_{faculty}.csv")
+        windows_file = os.path.join(windows_dir, f"syllabus_data_{faculty}.csv")
+        
+        format_syllabus_data(source_file, mac_file)
+        convert_to_utf8_with_bom(mac_file, windows_file)
 
     log(f"Total Execution Time {time.time() - start_time:.6f} seconds")
     log("==========Scraping completed==========")
