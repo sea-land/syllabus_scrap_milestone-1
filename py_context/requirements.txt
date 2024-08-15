@@ -3,3 +3,4 @@ selenium
 pandas
 mojimoji
 bs4
+fugashi[unidic-lite]
