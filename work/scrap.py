@@ -15,20 +15,21 @@ from selenium.common.exceptions import NoSuchElementException
 from mojimoji import zen_to_han
 from bs4 import BeautifulSoup
 
-# 配列の定数(マジックナンバー防止用)
-FACULTY=0
-CODE=1
-CATEGORY=2
-SUBJECT=3
-SUBJECT_KANA=4
-TEACHER=5
-TERM=6
-PERIOD=7
-TYPE=8
-DESCRIPTION=9
+# 定数
+FACULTY = 0
+CODE = 1
+CATEGORY = 2
+SUBJECT = 3
+SUBJECT_KANA = 4
+TEACHER = 5
+TERM = 6
+PERIOD = 7
+TYPE = 8
+DESCRIPTION = 9
 
-faculties = ["政経", "法学", "教育", "商学", "社学", "国際教養", "文構", "文", "基幹", "創造", "先進", "人科", "スポーツ", "グローバル"]
-categories={
+FACULTIES = ["政経", "法学", "教育", "商学", "社学", "国際教養", "文構", "文", "基幹", "創造", "先進", "人科", "スポーツ", "グローバル"]
+
+CATEGORIES={
     "基幹":[
         "A群：複合領域",
         "A群：外国語-英語",
@@ -76,6 +77,19 @@ categories={
     ]
 }
 
+CLASS_TYPE_MAP = {
+    "L": "講義",
+    "S": "演習/ゼミ",
+    "W": "実習/実験/実技",
+    "F": "外国語",
+    "P": "実践/フィールドワーク",
+    "G": "研究",
+    "T": "論文",
+    "B": "対面+オンデマンド",
+    "O": "オンデマンド",
+    "X": "その他"
+}
+
 
 def set_logger():
     # 全体のログ設定
@@ -92,9 +106,6 @@ def set_logger():
     main_logger.setLevel(DEBUG)
 
 
-set_logger()
-
-
 def log(arg, level=DEBUG):
     logger = getLogger(__name__)
     if level == DEBUG:
@@ -103,16 +114,41 @@ def log(arg, level=DEBUG):
         logger.error(arg)
 
 
-def get_current():
+def get_current_date():
     now = datetime.datetime.now()
     return now.year, now.month
+
+
+def check_versions():
+    try:
+        chrome_version = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True)
+        log("Google Chrome version:"+chrome_version.stdout.strip())
+    except FileNotFoundError:
+        log("Google Chrome is not installed or not found in the PATH.", ERROR)
+
+    try:
+        chromedriver_version = subprocess.run(["chromedriver", "--version"], capture_output=True, text=True)
+        log("Chromedriver version:"+chromedriver_version.stdout.strip())
+    except FileNotFoundError:
+        log("Chromedriver is not installed or not found in the PATH.", ERROR)
+
+
+def init_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--verbose")
+
+    return webdriver.Remote(command_executor="http://selenium:4444/wd/hub", options=chrome_options)
 
 
 def scrape_syllabus_data(driver, dest_dir):
     log("Accessing Waseda's syllabus\n")
     driver.get("https://www.wsl.waseda.jp/syllabus/JAA101.php")
 
-    for faculty in faculties:
+    for faculty in FACULTIES:
         log(f"Accessing {faculty} syllabus")
         faculty_file = f"{dest_dir}/raw_syllabus_data_{faculty}.csv"
 
@@ -124,8 +160,8 @@ def scrape_syllabus_data(driver, dest_dir):
             select.select_by_visible_text(faculty)
 
             # 基幹、創造、先進の場合、カテゴリを選択
-            if faculty in categories:
-                for category in categories[faculty]:
+            if faculty in CATEGORIES:
+                for category in CATEGORIES[faculty]:
                     select = Select(driver.find_element(By.NAME, "p_keya"))
                     select.select_by_visible_text(category)
 
@@ -222,7 +258,7 @@ def process_schedule(row):
                 expanded_rows.append(common_data + [new_schedule])
         except ValueError:
             # 変換エラーをキャッチし、元のデータを追加
-            log(f"スケジュール範囲 '{time_range}' の処理中にエラーが発生しました。行: {row}", ERROR)
+            log(f"曜日時限 '{time_range}' の処理中にエラーが発生しました。行: {row}", ERROR)
             expanded_rows.append(list(row))
     else:
         # ':' や '-' が含まれていない場合、そのまま追加
@@ -231,35 +267,10 @@ def process_schedule(row):
     return expanded_rows
 
 
-def check_versions():
-    try:
-        chrome_version = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True)
-        log("Google Chrome version:"+chrome_version.stdout.strip())
-    except FileNotFoundError:
-        log("Google Chrome is not installed or not found in the PATH.", ERROR)
-
-    try:
-        chromedriver_version = subprocess.run(["chromedriver", "--version"], capture_output=True, text=True)
-        log("Chromedriver version:"+chromedriver_version.stdout.strip())
-    except FileNotFoundError:
-        log("Chromedriver is not installed or not found in the PATH.", ERROR)
-
 
 def format_syllabus_data(source_path, dest_path):
     tagger = Tagger()
 
-    class_type_map = {
-        "L": "講義",
-        "S": "演習/ゼミ",
-        "W": "実習/実験/実技",
-        "F": "外国語",
-        "P": "実践/フィールドワーク",
-        "G": "研究",
-        "T": "論文",
-        "B": "対面+オンデマンド",
-        "O": "オンデマンド",
-        "X": "その他"
-    }
 
     def get_furigana(text):
         words = tagger(text)
@@ -268,7 +279,7 @@ def format_syllabus_data(source_path, dest_path):
 
     def get_class_type(code):
         class_type_code = code[-1]
-        return class_type_map.get(class_type_code, "不明")
+        return CLASS_TYPE_MAP.get(class_type_code, "不明")
 
     def adjust_teacher_name(teacher_name):
         # スラッシュの数を数えて、2つ以上の場合は「オムニバス」に変更
@@ -306,24 +317,18 @@ def format_syllabus_data(source_path, dest_path):
                 log(f"Error processing row: {row} - {e}", ERROR)
 
 
-def main():
+def run():
     log("==========Scraping started==========")
+    set_logger()
     start_time = time.time()
     try:
         check_versions()
-        year, month = get_current()
+        year, month = get_current_date()
         dest_dir = f"../data/{year}_{month}"
 
         os.makedirs(dest_dir, exist_ok=True)
 
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--verbose")
-
-        driver = webdriver.Remote(command_executor="http://selenium:4444/wd/hub", options=chrome_options)
+        driver=init_driver()
     except Exception as e:
         log(f"Error : {e}", ERROR)
 
@@ -332,7 +337,7 @@ def main():
     finally:
         driver.quit()
 
-    for faculty in faculties:
+    for faculty in FACULTIES:
         log(f"Formatting {faculty} data.")
         source_file = os.path.join(dest_dir, f"raw_syllabus_data_{faculty}.csv")
         dest_file = os.path.join(dest_dir, f"syllabus_data_{faculty}.csv")
@@ -343,4 +348,4 @@ def main():
     
 
 if __name__ == "__main__":
-    main()
+    run()
