@@ -242,40 +242,6 @@ def scrape_data_for_faculty_without_category(driver, writer, faculty):
     driver.find_element(By.CLASS_NAME, "ch-back").click()
 
 
-def process_schedule(row):
-    schedule = str(row[PERIOD])
-    common_data = row[:PERIOD]
-    expanded_rows = []
-
-    if ":" in schedule:
-        # ':' が含まれている場合の処理
-        for time in schedule.split(":"):
-            if len(time) < 4:
-                continue
-            time = time.replace("　", " ").replace("\n", " ")
-            new_schedule = time.split(" ")[0]
-            expanded_rows.append(common_data + [new_schedule])
-    elif "-" in schedule:
-        # '-' が含まれている場合の処理
-        schedule = schedule.replace(" ", "")
-        day, time_range = schedule[0], schedule[1:]
-        try:
-            start, end = map(int, time_range.split("-"))
-            for time in range(start, end + 1):
-                new_schedule = f"{day}{time}時限"
-                expanded_rows.append(common_data + [new_schedule])
-        except ValueError:
-            # 変換エラーをキャッチし、元のデータを追加
-            log(f"曜日時限 '{time_range}' の処理中にエラーが発生しました。行: {row}", ERROR)
-            expanded_rows.append(list(row))
-    else:
-        # ':' や '-' が含まれていない場合、そのまま追加
-        expanded_rows.append(list(row))
-
-    return expanded_rows
-
-
-
 def format_syllabus_data(source_path, dest_path):
     tagger = Tagger()
 
@@ -304,6 +270,9 @@ def format_syllabus_data(source_path, dest_path):
                 names[i] = name.replace(" ", ".")
         return "･".join(names)
         
+    def remove_newlines(text):
+            return text.replace("\n", "").replace("\r", "")    
+    
     with open(source_path, "r", newline="", encoding="utf-8") as source, open(dest_path, "w", newline="", encoding="utf-8") as dest:
         reader = csv.reader(source)
         writer = csv.writer(dest)
@@ -317,9 +286,8 @@ def format_syllabus_data(source_path, dest_path):
                 han_row[SUBJECT_KANA] = get_furigana(han_row[SUBJECT])
                 han_row[TEACHER] = adjust_teacher_name(han_row[TEACHER])
                 han_row[TYPE] = get_class_type(han_row[CODE])
-                fmt = process_schedule(han_row)
-                for sub_row in fmt:
-                    writer.writerow(sub_row)
+                han_row[DESCRIPTION] = remove_newlines(han_row[DESCRIPTION])
+                writer.writerow(han_row)
             except Exception as e:
                 log(f"Error processing row: {row} - {e}", ERROR)
 
