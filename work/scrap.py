@@ -159,79 +159,87 @@ def scrape_syllabus_data(driver, dest_dir):
             select = Select(driver.find_element(By.NAME, "p_gakubu"))
             select.select_by_visible_text(faculty)
 
-            # 基幹、創造、先進の場合、カテゴリを選択
             if faculty in CATEGORIES:
-                for category in CATEGORIES[faculty]:
-                    select = Select(driver.find_element(By.NAME, "p_keya"))
-                    select.select_by_visible_text(category)
-
-                    # 検索を実行(javascriptから直接実行)
-                    driver.execute_script("func_search('JAA103SubCon');")#検索ボタン
-                    driver.execute_script("func_showchg('JAA103SubCon', '1000');")#表示数を1000に変更
-
-                    log(f"Scraping {faculty} - {category} data.")
-                    start_time = time.time()
-                    total_elements = 0
-                    while True:
-                        try:
-                            soup = BeautifulSoup(driver.page_source, "html.parser")
-                            rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
-                            total_elements += len(rows[1:])
-                            for row in rows[1:]:
-                                cols = row.find_all("td")
-                                writer.writerow([
-                                    faculty,
-                                    cols[1].text.strip(),
-                                    category,
-                                    cols[2].text.strip(),
-                                    "",
-                                    cols[3].text.strip(),
-                                    cols[5].text.strip(),
-                                    cols[6].text.strip(),
-                                    "",
-                                    cols[8].text.strip(),
-                                ])
-                            # 次のページへ
-                            driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
-                        except NoSuchElementException:
-                            break
-                    log(f"Total Number of Subjects {faculty} - {category}: {total_elements}")
-                    log(f"Finished in {time.time() - start_time:.6f} seconds\n")
-                    driver.find_element(By.CLASS_NAME, "ch-back").click()
+                scrape_data_for_faculty_and_categories(driver, writer, faculty)
             else:
-                # カテゴリがない場合の処理
-                driver.execute_script("func_search('JAA103SubCon');")
-                driver.execute_script("func_showchg('JAA103SubCon', '1000');")
+                scrape_data_for_faculty_without_category(driver, writer, faculty)
 
-                log(f"Scraping {faculty} data.")
-                start_time = time.time()
-                total_elements = 0
-                while True:
-                    try:
-                        soup = BeautifulSoup(driver.page_source, "html.parser")
-                        rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
-                        total_elements += len(rows[1:])
-                        for row in rows[1:]:
-                            cols = row.find_all("td")
-                            writer.writerow([
-                                faculty,
-                                cols[1].text.strip(),
-                                "",
-                                cols[2].text.strip(),
-                                "",
-                                cols[3].text.strip(),
-                                cols[5].text.strip(),
-                                cols[6].text.strip(),
-                                "",
-                                cols[8].text.strip(),
-                            ])
-                        # 次のページへ
-                        driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
-                    except NoSuchElementException:
-                        break
-                log(f"Total Number of Subjects {faculty}: {total_elements}")
-                log(f"Finished in {time.time() - start_time:.6f} seconds\n")
-                driver.find_element(By.CLASS_NAME, "ch-back").click()
+
+def scrape_data_for_faculty_and_categories(driver, writer, faculty):
+    # 理工のための処理
+    for category in CATEGORIES[faculty]:
+        select = Select(driver.find_element(By.NAME, "p_keya"))
+        select.select_by_visible_text(category)
+
+        # 検索を実行(javascriptから直接実行)
+        driver.execute_script("func_search('JAA103SubCon');")  # 検索ボタン
+        driver.execute_script("func_showchg('JAA103SubCon', '1000');")  # 表示数を1000に変更
+
+        log(f"Scraping {faculty} - {category} data.")
+        start_time = time.time()
+        total_elements = 0
+        while True:
+            try:
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+                rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
+                total_elements += len(rows[1:])
+                for row in rows[1:]:
+                    cols = row.find_all("td")
+                    writer.writerow([
+                        faculty,
+                        cols[1].text.strip(),
+                        category,
+                        cols[2].text.strip(),
+                        "",
+                        cols[3].text.strip(),
+                        cols[5].text.strip(),
+                        cols[6].text.strip(),
+                        "",
+                        cols[8].text.strip(),
+                    ])
+                # 次のページへ
+                driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
+            except NoSuchElementException:
+                break
+        log(f"Total Number of Subjects {faculty} - {category}: {total_elements}")
+        log(f"Finished in {time.time() - start_time:.6f} seconds\n")
+        driver.find_element(By.CLASS_NAME, "ch-back").click()
+
+
+def scrape_data_for_faculty_without_category(driver, writer, faculty):
+    # 理工以外の処理
+    driver.execute_script("func_search('JAA103SubCon');")
+    driver.execute_script("func_showchg('JAA103SubCon', '1000');")
+
+    log(f"Scraping {faculty} data.")
+    start_time = time.time()
+    total_elements = 0
+    while True:
+        try:
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+            rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
+            total_elements += len(rows[1:])
+            for row in rows[1:]:
+                cols = row.find_all("td")
+                writer.writerow([
+                    faculty,
+                    cols[1].text.strip(),
+                    "",
+                    cols[2].text.strip(),
+                    "",
+                    cols[3].text.strip(),
+                    cols[5].text.strip(),
+                    cols[6].text.strip(),
+                    "",
+                    cols[8].text.strip(),
+                ])
+            # 次のページへ
+            driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
+        except NoSuchElementException:
+            break
+    log(f"Total Number of Subjects {faculty}: {total_elements}")
+    log(f"Finished in {time.time() - start_time:.6f} seconds\n")
+    driver.find_element(By.CLASS_NAME, "ch-back").click()
 
 
 def process_schedule(row):
@@ -270,7 +278,6 @@ def process_schedule(row):
 
 def format_syllabus_data(source_path, dest_path):
     tagger = Tagger()
-
 
     def get_furigana(text):
         words = tagger(text)
