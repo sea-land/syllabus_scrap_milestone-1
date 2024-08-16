@@ -45,6 +45,7 @@ CATEGORIES={
         "表現工学科（専門科目）",
         "情報通信学科（専門科目）",
         "機械科学・航空宇宙学科（専門科目）",
+        "",
         ],
     "創造":[
         "A群：複合領域",
@@ -59,6 +60,7 @@ CATEGORIES={
         "経営システム工学科（専門科目）",
         "社会環境工学科（専門科目）",
         "環境資源工学科（専門科目）",
+        "",
     ],
     "先進":[
         "A群：複合領域",
@@ -74,6 +76,7 @@ CATEGORIES={
         "応用化学科（専門科目）",
         "生命医科学科（専門科目）",
         "電気・情報生命工学科（専門科目）",
+        "",
     ]
 }
 
@@ -166,54 +169,80 @@ def scrape_syllabus_data(driver, dest_dir):
 
 
 def scrape_data_for_faculty_and_categories(driver, writer, faculty):
+    log(f"Scraping {faculty} data.")
+    start_time = time.time()
+    # 重複回避のためのセットを用意
+    seen_subjects = set()
+    total_elements = 0
     # 理工のための処理
     for category in CATEGORIES[faculty]:
+        log(f"Scraping {faculty} - {category} data.")
         select = Select(driver.find_element(By.NAME, "p_keya"))
         select.select_by_visible_text(category)
+        total_category_elements = 0
 
         # 検索を実行(javascriptから直接実行)
         driver.execute_script("func_search('JAA103SubCon');")  # 検索ボタン
         driver.execute_script("func_showchg('JAA103SubCon', '1000');")  # 表示数を1000に変更
 
-        log(f"Scraping {faculty} - {category} data.")
-        start_time = time.time()
-        total_elements = 0
         while True:
             try:
                 soup = BeautifulSoup(driver.page_source, "html.parser")
                 rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
-                total_elements += len(rows[1:])
                 for row in rows[1:]:
                     cols = row.find_all("td")
+                    course_code = cols[1].text.strip()
+                    subject_name = cols[2].text.strip()
+                    teacher_name = cols[3].text.strip()
+                    semester = cols[5].text.strip()
+                    period = cols[6].text.strip()
+                    description = cols[8].text.strip()
+                    
+
+                    if category=="":
+                        if (course_code, subject_name, teacher_name, semester, period, description) in seen_subjects:
+                            # log(f"Skipping duplicate subject: {course_code} - {subject_name} - {teacher_name} - {semester}")
+                            continue
+                    
+                    if category!="":    
+                        # 重複がなければセットに追加
+                        seen_subjects.add((course_code, subject_name, teacher_name, semester))
+                    
                     writer.writerow([
                         faculty,
-                        cols[1].text.strip(),
+                        course_code,
                         category,
-                        cols[2].text.strip(),
+                        subject_name,
                         "",
-                        cols[3].text.strip(),
-                        cols[5].text.strip(),
-                        cols[6].text.strip(),
+                        teacher_name,
+                        semester,
+                        period,
                         "",
-                        cols[8].text.strip(),
+                        description,
                     ])
+                    total_category_elements += 1
+                    total_elements += 1
                 # 次のページへ
                 driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
             except NoSuchElementException:
                 break
-        log(f"Total Number of Subjects {faculty} - {category}: {total_elements}")
+        log(f"Total Number of Subjects {faculty} - {category}: {total_category_elements}")
         log(f"Finished in {time.time() - start_time:.6f} seconds\n")
         driver.find_element(By.CLASS_NAME, "ch-back").click()
 
+    log(f"Total Number of Subjects {faculty}: {total_elements}")
+    log(f"Finished in {time.time() - start_time:.6f} seconds\n")
+
+
 
 def scrape_data_for_faculty_without_category(driver, writer, faculty):
+    log(f"Scraping {faculty} data.")
+    start_time = time.time()
+    total_elements = 0
     # 理工以外の処理
     driver.execute_script("func_search('JAA103SubCon');")
     driver.execute_script("func_showchg('JAA103SubCon', '1000');")
 
-    log(f"Scraping {faculty} data.")
-    start_time = time.time()
-    total_elements = 0
     while True:
         try:
             soup = BeautifulSoup(driver.page_source, "html.parser")
