@@ -4,7 +4,7 @@ import datetime
 import time
 import subprocess
 import re
-from fugashi import Tagger
+from fugashi import Tagger # type: ignore
 from logging import getLogger, handlers, Formatter, DEBUG, ERROR
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -177,8 +177,8 @@ def init_driver():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--verbose")
-
-    return webdriver.Remote(command_executor="http://selenium:4444/wd/hub", options=chrome_options)
+    chrome_service = Service('/usr/local/bin/chromedriver')
+    return webdriver.Chrome(service=chrome_service, options=chrome_options)
 
 # シラバスデータをスクレイピングする関数
 def scrape_syllabus_data(driver, dest_dir):
