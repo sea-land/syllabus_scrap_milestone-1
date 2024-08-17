@@ -424,7 +424,7 @@ def run():
     base_dir = f"../data/{year}_{month}"
     row_dir = os.path.join(base_dir, "rowData")
     mac_dir = os.path.join(base_dir, "forMac")
-    win_dir = os.path.join(base_dir, "forWindows")
+    win_dir = os.path.join(base_dir, "forWin")
 
     os.makedirs(row_dir, exist_ok=True)
     os.makedirs(mac_dir, exist_ok=True)
