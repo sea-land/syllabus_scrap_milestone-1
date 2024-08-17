@@ -2,7 +2,6 @@ import os
 import csv
 import datetime
 import time
-import subprocess
 import re
 from fugashi import Tagger # type: ignore
 from logging import getLogger, handlers, Formatter, DEBUG, ERROR
@@ -142,21 +141,6 @@ def get_current_date():
     now = datetime.datetime.now()
     return now.year, now.month
 
-def check_versions():
-    """
-    Google ChromeとChromedriverのバージョンをチェックし、ログに出力する関数。
-    """
-    try:
-        chrome_version = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True)
-        log("Google Chrome version:"+chrome_version.stdout.strip())
-    except FileNotFoundError:
-        log("Google Chrome is not installed or not found in the PATH.", ERROR)
-
-    try:
-        chromedriver_version = subprocess.run(["chromedriver", "--version"], capture_output=True, text=True)
-        log("Chromedriver version:"+chromedriver_version.stdout.strip())
-    except FileNotFoundError:
-        log("Chromedriver is not installed or not found in the PATH.", ERROR)
 
 def init_driver():
     """
@@ -166,11 +150,11 @@ def init_driver():
         WebDriverインスタンス。
     """
     options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--verbose")
+    options.add_argument("--headless")  # ヘッドレスモードで実行
+    options.add_argument("--disable-gpu")  # GPUの無効化
+    options.add_argument("--no-sandbox")  # サンドボックスを無効化
+    options.add_argument("--disable-dev-shm-usage")  # /dev/shmの使用を無効化
+    options.add_argument("--verbose")  # 詳細なログを出力
     return webdriver.Remote(command_executor="http://selenium:4444/wd/hub", options=options)
 
 def scrape_syllabus_data(driver, dest_dir):
@@ -436,7 +420,6 @@ def run():
     start_time = time.time()
     driver = init_driver()
     
-    check_versions()
     year, month = get_current_date()
     base_dir = f"../data/{year}_{month}"
     row_dir = os.path.join(base_dir, "rowData")

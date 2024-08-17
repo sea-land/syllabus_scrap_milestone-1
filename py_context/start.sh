@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# Start Xvfb
-Xvfb :99 -ac -screen 0 1280x1024x16 &
+# 固定の解像度を指定して Xvfb を起動
+Xvfb :99 -ac -screen 0 1920x1080x24 &
 
-# Set display environment variable
+# DISPLAY 環境変数を設定
 export DISPLAY=:99
 
-# Wait for a few seconds to ensure Chrome starts
-sleep 5
+# Xvfb が完全に起動するまで待機
+sleep 3
 
-# Execute Python script
+# Python スクリプトを実行
 python /work/scrap.py
-
-# Keep the container running
-/bin/bash
