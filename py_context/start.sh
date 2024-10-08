@@ -7,7 +7,7 @@ Xvfb :99 -ac -screen 0 1920x1080x24 &
 export DISPLAY=:99
 
 # Xvfb が完全に起動するまで待機
-sleep 3
+sleep 5
 
 # Python スクリプトを実行
 python /work/scrap.py
