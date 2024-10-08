@@ -21,10 +21,11 @@ CATEGORY = 2
 SUBJECT = 3
 SUBJECT_KANA = 4
 TEACHER = 5
-TERM = 6
-PERIOD = 7
-TYPE = 8
-DESCRIPTION = 9
+TEACHER_KANA = 6
+TERM = 7
+PERIOD = 8
+TYPE = 9
+DESCRIPTION = 10
 
 # 対象学部のリスト
 FACULTIES = ["政経", "法学", "教育", "商学", "社学", "国際教養", "文構", "文", "基幹", "創造", "先進", "人科", "スポーツ", "グローバル"]
@@ -174,7 +175,7 @@ def scrape_syllabus_data(driver, dest_dir):
 
         with open(faculty_file, "w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
-            writer.writerow(["学部", "コースコード", "カテゴリ", "科目名","カモクメイ", "担当教員", "学期", "曜日時限", "授業形式", "授業概要"])
+            writer.writerow(["学部", "コースコード", "カテゴリ", "科目名", "カモクメイ", "担当教員", "フリガナ", "学期", "曜日時限", "授業形式", "授業概要"])
 
             select = Select(driver.find_element(By.NAME, "p_gakubu"))
             select.select_by_visible_text(faculty)
@@ -241,6 +242,7 @@ def scrape_data_categories(driver, writer, faculty):
                         subject,
                         "",
                         teacher,
+                        "",
                         semester,
                         period,
                         "",
@@ -291,6 +293,7 @@ def scrape_data_without_category(driver, writer, faculty):
                     cols[2].text.strip(),
                     "",
                     cols[3].text.strip(),
+                    "",
                     cols[5].text.strip(),
                     cols[6].text.strip(),
                     "",
@@ -383,7 +386,7 @@ def format_syllabus_data(src_path, dest_path):
              open(dest_path, "w", newline="", encoding="utf-8") as dest:
             reader = csv.reader(source)
             writer = csv.writer(dest)
-            writer.writerow(["学部", "コースコード", "カテゴリ", "科目名", "カモクメイ", "担当教員", "学期", "曜日時限", "授業形式", "授業概要"])
+            writer.writerow(["学部", "コースコード", "カテゴリ", "科目名", "カモクメイ", "担当教員", "フリガナ", "学期", "曜日時限", "授業形式", "授業概要"])
             rows = list(reader)
         
             for row in rows[1:]:
@@ -391,6 +394,7 @@ def format_syllabus_data(src_path, dest_path):
                     han_row = [zen_to_han(cell, kana=False) for cell in row]
                     han_row[SUBJECT_KANA] = get_furigana(han_row[SUBJECT])
                     han_row[TEACHER] = format_teacher_name(han_row[TEACHER])
+                    han_row[TEACHER_KANA] = get_furigana(han_row[TEACHER])
                     han_row[TYPE] = get_class_type(han_row[CODE])
                     han_row[DESCRIPTION] = remove_newlines(han_row[DESCRIPTION])
                     writer.writerow(han_row)
