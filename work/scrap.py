@@ -15,73 +15,36 @@ from mojimoji import zen_to_han
 from bs4 import BeautifulSoup
 
 # 定数の定義
-FACULTY = 0
-CODE = 1
-CATEGORY = 2
-SUBJECT = 3
-SUBJECT_KANA = 4
-TEACHER = 5
-TEACHER_KANA = 6
-TERM = 7
-PERIOD = 8
-TYPE = 9
-DESCRIPTION = 10
+CATEGORY = 0
+SUBJECT_ID = 1
+FACULTY = 2
+YEAR = 3
+CODE = 4
+SUBJECT = 5
+SUBJECT_KANA = 6
+TEACHER = 7
+TEACHER_KANA = 8
+SEMESTER = 9
+PERIOD = 10
+SCHOOL_YEAR = 11
+UNITS = 12
+ROOM = 13
+CAMPUS = 14
+SUBJECT_KEY = 15
+SUBJECT_CLASS = 16
+USED_LANGUAGE = 17
+SUBJECT_METHOD = 18
+LEVEL = 19
+TYPE = 20
+DESCRIPTION = 21
+URL = 22
+
+#CSVファイルヘッダー項目
+HEADER=["科目区分", "授業ID", "学部", "年度", "コースコード", "科目名", "カモクメイ", "担当教員", "フリガナ", "学期", "曜日時限", "学年", "単位数", "教室", "キャンパス", "科目キー", "科目クラス", "使用言語", "授業形式", "レベル", "授業形態", "授業概要", "シラバスURL"]
 
 # 対象学部のリスト
 FACULTIES = ["政経", "法学", "教育", "商学", "社学", "国際教養", "文構", "文", "基幹", "創造", "先進", "人科", "スポーツ", "グローバル"]
 
-# カテゴリ定義
-CATEGORIES = {
-    "基幹": [
-        "A群：複合領域",
-        "A群：外国語-英語",
-        "A群：外国語-初修外国語",
-        "B群：数学",
-        "B群：自然科学",
-        "B群：実験・実習・製作",
-        "B群：情報関連科目",
-        "数学科（専門科目）",
-        "応用数理学科（専門科目）",
-        "情報理工学科（専門科目）",
-        "電子物理システム学科（専門科目）",
-        "表現工学科（専門科目）",
-        "情報通信学科（専門科目）",
-        "機械科学・航空宇宙学科（専門科目）",
-        "",
-    ],
-    "創造": [
-        "A群：複合領域",
-        "A群：外国語-英語",
-        "A群：外国語-初修外国語",
-        "B群：数学",
-        "B群：自然科学",
-        "B群：実験・実習・製作",
-        "B群：情報関連科目",
-        "C群：創造理工学部共通科目",
-        "建築学科（専門科目）",
-        "総合機械工学科（専門科目）",
-        "経営システム工学科（専門科目）",
-        "社会環境工学科（専門科目）",
-        "環境資源工学科（専門科目）",
-        "",
-    ],
-    "先進": [
-        "A群：複合領域",
-        "A群：外国語-英語",
-        "A群：外国語-初修外国語",
-        "B群：数学",
-        "B群：自然科学",
-        "B群：実験・実習・製作",
-        "B群：情報関連科目",
-        "物理学科（専門科目）",
-        "応用物理学科（専門科目）",
-        "化学・生命化学科（専門科目）",
-        "応用化学科（専門科目）",
-        "生命医科学科（専門科目）",
-        "電気・情報生命工学科（専門科目）",
-        "",
-    ]
-}
 
 # コースコードの末尾に基づく授業形式のマッピング
 CLASS_TYPE_MAP = {
@@ -151,7 +114,7 @@ def init_driver():
         WebDriverインスタンス。
     """
     options = Options()
-    options.add_argument("--headless")  # ヘッドレスモードで実行
+    # options.add_argument("--headless")  # ヘッドレスモードで実行
     options.add_argument("--disable-gpu")  # GPUの無効化
     options.add_argument("--no-sandbox")  # サンドボックスを無効化
     options.add_argument("--disable-dev-shm-usage")  # /dev/shmの使用を無効化
@@ -166,112 +129,30 @@ def scrape_syllabus_data(driver, dest_dir):
         driver: WebDriverインスタンス。
         dest_dir: データ保存先ディレクトリ。
     """
-    log("Accessing Waseda's syllabus\n")
+    log("大学シラバスにアクセスします。\n")
     driver.get("https://www.wsl.waseda.jp/syllabus/JAA101.php")
 
     for faculty in FACULTIES:
-        log(f"Accessing {faculty} syllabus")
-        faculty_file = f"{dest_dir}/raw_syllabus_data_{faculty}.csv"
+        log(f"{faculty} のシラバスにアクセスしています。")
+        dest_path = os.path.join(dest_dir, f"{faculty}_raw_syllabus_data.csv")
 
-        with open(faculty_file, "w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(["学部", "コースコード", "カテゴリ", "科目名", "カモクメイ", "担当教員", "フリガナ", "学期", "曜日時限", "授業形式", "授業概要"])
-
-            select = Select(driver.find_element(By.NAME, "p_gakubu"))
-            select.select_by_visible_text(faculty)
-
-            if faculty in CATEGORIES:
-                scrape_data_categories(driver, writer, faculty)
-            else:
-                scrape_data_without_category(driver, writer, faculty)
+        select = Select(driver.find_element(By.NAME, "p_gakubu"))
+        select.select_by_visible_text(faculty)
+        scrape_data(driver, dest_path, faculty)
 
 
-def scrape_data_categories(driver, writer, faculty):
+
+
+def scrape_data(driver, dest_path, faculty):
     """
-    スクレイピングを実行し、カテゴリが定義されている学部のデータをCSVに書き出します。
+    スクレイピングを実行し、学部のデータをCSVに書き出します。
 
     Args:
         driver: WebDriverインスタンス。
         writer: CSVライターオブジェクト。
         faculty: 学部名。
     """
-    start_time = time.time()
-    seen_subjects = set()
-    total_elements = 0
-    duplicate_count=0
-    for category in CATEGORIES.get(faculty, []):
-        log(f"Scraping {faculty} - {category} data.")
-        start_category_time = time.time()
-        total_category_elements = 0
-
-        # カテゴリ選択
-        select = Select(driver.find_element(By.NAME, "p_keya"))
-        select.select_by_visible_text(category)
-
-        # 検索と表示数変更
-        driver.execute_script("func_search('JAA103SubCon');")
-        driver.execute_script("func_showchg('JAA103SubCon', '1000');")
-
-        while True:
-            try:
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-                rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
-
-                for row in rows[1:]:
-                    cols = row.find_all("td")
-                    code = cols[1].text.strip()
-                    subject = cols[2].text.strip()
-                    teacher = cols[3].text.strip()
-                    semester = cols[5].text.strip()
-                    period = cols[6].text.strip()
-                    room = cols[7].text.strip()
-                    desc = cols[8].text.strip()
-
-                    if category == "" and (code, subject, teacher, semester, period, room) in seen_subjects:
-                        duplicate_count += 1
-                        continue
-                    
-                    if category!="":    
-                        # 重複がなければセットに追加
-                        seen_subjects.add((code, subject, teacher, semester, period, room))
-                    
-                    writer.writerow([
-                        faculty,
-                        code,
-                        category,
-                        subject,
-                        "",
-                        teacher,
-                        "",
-                        semester,
-                        period,
-                        "",
-                        desc,
-                    ])
-                    total_category_elements += 1
-                    total_elements += 1
-
-                # 次のページへ
-                driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
-            except NoSuchElementException:
-                break
-
-        log(f"Subjects: {total_category_elements} Time: {time.time() - start_category_time:.6f} seconds\n")
-        driver.find_element(By.CLASS_NAME, "ch-back").click()
-
-    log(f"All {faculty} Subjects: {total_elements} Time: {time.time() - start_time:.6f} seconds\n")
-
-
-def scrape_data_without_category(driver, writer, faculty):
-    """
-    スクレイピングを実行し、カテゴリが定義されていない学部のデータをCSVに書き出します。
-
-    Args:
-        driver: WebDriverインスタンス。
-        writer: CSVライターオブジェクト。
-        faculty: 学部名。
-    """
-    log(f"Scraping {faculty} data.")
+    log(f"{faculty} の科目インデックスを取得中です。")
     start_time = time.time()
     total_elements = 0
 
@@ -279,35 +160,169 @@ def scrape_data_without_category(driver, writer, faculty):
     driver.execute_script("func_search('JAA103SubCon');")
     driver.execute_script("func_showchg('JAA103SubCon', '1000');")
 
+    with open(dest_path, "w", newline="", encoding="utf-8") as dest:
+        writer=csv.writer(dest)
+        writer.writerow(HEADER)
+        total_elements = save_table(driver,writer,faculty)
+        log(f"総科目数: {total_elements} 実行時間: {time.time() - start_time:.6f} 秒\n")
+        driver.find_element(By.CLASS_NAME, "ch-back").click()
+
+
+def save_table(driver,writer,faculty):
+    total_elements = 0
     while True:
         try:
             soup = BeautifulSoup(driver.page_source, "html.parser")
             rows = soup.select("#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr")
-
             for row in rows[1:]:
                 cols = row.find_all("td")
+                year = cols[0].text.strip()
+                code = cols[1].text.strip()
+                subject = cols[2].text.strip()
+                teacher = cols[3].text.strip()
+                semester = cols[5].text.strip()
+                period = cols[6].text.strip()
+                room = cols[7].text.strip()
+                desc = cols[8].text.strip()
+
+                # 科目の詳細ページのリンクを取得
+                link_element = cols[2].find("a", onclick=True)
+                if link_element:
+                    onclick_value = link_element['onclick']
+                    # 'post_submit('JAA104DtlSubCon', '1100001010012024110000101011')' から pKey を抽出
+                    pkey = onclick_value.split("'")[3]
+                    detail_url = f"https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey={pkey}&pLng=jp"
+                else:
+                    detail_url = ""
+
+
+                category = ""
+                school_year = ""
+                units = ""
+                campus = ""
+                subject_key = ""
+                subject_class = ""
+                class_lang = ""
+                class_method = ""
+                level = ""
+                class_type = ""
+
                 writer.writerow([
+                    category,
+                    "",
                     faculty,
-                    cols[1].text.strip(),
+                    year,
+                    code,
+                    subject,
                     "",
-                    cols[2].text.strip(),
+                    teacher,
                     "",
-                    cols[3].text.strip(),
-                    "",
-                    cols[5].text.strip(),
-                    cols[6].text.strip(),
-                    "",
-                    cols[8].text.strip(),
+                    semester,
+                    period,
+                    school_year,
+                    units,
+                    room,
+                    campus,
+                    subject_key,
+                    subject_class,
+                    class_lang,
+                    class_method,
+                    level,
+                    class_type,
+                    remove_newlines(desc),
+                    detail_url,
                 ])
-                total_elements += 1
+                total_elements+=1
 
             # 次のページへ
             driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
         except NoSuchElementException:
             break
+    return total_elements
 
-    log(f"Subjects: {total_elements} Time: {time.time() - start_time:.6f} seconds\n")
-    driver.find_element(By.CLASS_NAME, "ch-back").click()
+def add_details(driver,src_path,dest_path):
+    with open(src_path, "r", newline="", encoding="utf-8") as source, \
+         open(dest_path, "w", newline="", encoding="utf-8") as dest:
+        reader=csv.reader(source)
+        writer=csv.writer(dest)
+        writer.writerow(HEADER)
+        rows=list(reader)
+        total_elements = 0
+        while True:
+            try:
+                for row in rows[1:]:
+                    if(total_elements%100==0):log(f"{total_elements}/{len(rows)-1}件完了(100件完了ごとに更新されます)")
+                    detail_url = row[22]
+                    
+                    driver.get(detail_url)
+                    detail_page = BeautifulSoup(driver.page_source, "html.parser")
+
+                    # テーブルのすべての行とセルを2次元リストに変換
+                    table_data = [
+                        [cell.get_text(strip=True) for cell in row.find_all(['td', 'th'])]
+                        for row in detail_page.select("#cEdit > div:nth-child(1) > div > div > div > div > div.ctable-main > table > tbody > tr")
+                    ]
+
+                    # 項目が存在しない場合は空欄をデフォルトにする
+                    def safe_get(data, row_idx, col_idx):
+                        try:
+                            return data[row_idx][col_idx]
+                        except IndexError:
+                            log(f"{table_data}の一部の情報が読み取れませんでした。",ERROR)
+                            return ""
+
+                    # 各フィールドのデータ取得
+                    # year = safe_get(table_data, 0, 1)
+                    # faculty = safe_get(table_data, 0, 3)
+                    # subject = safe_get(table_data, 1, 1)
+                    # teacher = safe_get(table_data, 2, 1)
+                    period = safe_get(table_data, 3, 1)
+                    category = safe_get(table_data, 4, 1)
+                    school_year = safe_get(table_data, 4, 3)
+                    units = safe_get(table_data, 4, 5)
+                    # room = safe_get(5,1)
+                    campus = safe_get(table_data, 5, 3)
+                    subject_key = safe_get(table_data, 6, 1)
+                    subject_class = safe_get(table_data, 6, 3)
+                    class_lang = safe_get(table_data, 7, 1)
+                    class_method = safe_get(table_data, 8, 1)
+                    level = safe_get(table_data, 13, 1)
+                    class_type = safe_get(table_data, 13, 3)
+
+                    writer.writerow([
+                        category,
+                        "",
+                        row[FACULTY],
+                        row[YEAR],
+                        row[CODE],
+                        row[SUBJECT],
+                        "",
+                        row[TEACHER],
+                        "",
+                        row[SEMESTER],
+                        period,
+                        school_year,
+                        units,
+                        row[ROOM],
+                        campus,
+                        subject_key,
+                        subject_class,
+                        class_lang,
+                        class_method,
+                        level,
+                        class_type,
+                        row[DESCRIPTION],
+                        detail_url,
+                    ])
+                    total_elements+=1
+
+                # 次のページへ
+                driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
+            except NoSuchElementException:
+                log(f"{total_elements}/{len(rows)-1}件完了")
+                break
+    return total_elements
+
 
 
 def get_furigana(text):
@@ -386,7 +401,7 @@ def format_syllabus_data(src_path, dest_path):
              open(dest_path, "w", newline="", encoding="utf-8") as dest:
             reader = csv.reader(source)
             writer = csv.writer(dest)
-            writer.writerow(["学部", "コースコード", "カテゴリ", "科目名", "カモクメイ", "担当教員", "フリガナ", "学期", "曜日時限", "授業形式", "授業概要"])
+            writer.writerow(HEADER)
             rows = list(reader)
         
             for row in rows[1:]:
@@ -396,7 +411,6 @@ def format_syllabus_data(src_path, dest_path):
                     han_row[TEACHER] = format_teacher_name(han_row[TEACHER])
                     han_row[TEACHER_KANA] = get_furigana(han_row[TEACHER])
                     han_row[TYPE] = get_class_type(han_row[CODE])
-                    han_row[DESCRIPTION] = remove_newlines(han_row[DESCRIPTION])
                     writer.writerow(han_row)
                 except Exception as e:
                     log(f"Error processing row {row}: {e}", ERROR)
@@ -420,36 +434,43 @@ def convert_to_utf8_sig(src_file, dest_file):
 
 def run():
     set_logger()
-    log("==========Scraping started============")
+    log("==========スクレイピング開始============")
     start_time = time.time()
     driver = init_driver()
     
     year, month = get_current_date()
     base_dir = f"../data/{year}_{month}"
     row_dir = os.path.join(base_dir, "rowData")
+    row_detail_dir = os.path.join(base_dir, "rowData_added_detail")
     mac_dir = os.path.join(base_dir, "forMac")
     win_dir = os.path.join(base_dir, "forWin")
 
     os.makedirs(row_dir, exist_ok=True)
+    os.makedirs(row_detail_dir, exist_ok=True)
     os.makedirs(mac_dir, exist_ok=True)
     os.makedirs(win_dir, exist_ok=True)
 
     try:
         scrape_syllabus_data(driver, row_dir)
+        for faculty in FACULTIES:
+            log(f"{faculty} の詳細情報を追加します。")
+            row_file = os.path.join(row_dir, f"{faculty}_raw_syllabus_data.csv")
+            row_detail_file = os.path.join(row_detail_dir, f"{faculty}_raw_syllabus_data.csv")
+            add_details(driver,row_file,row_detail_file)
     finally:
         driver.quit()
 
     for faculty in FACULTIES:
-        log(f"Formatting {faculty} data.")
-        row_file = os.path.join(row_dir, f"raw_syllabus_data_{faculty}.csv")
-        mac_file = os.path.join(mac_dir, f"syllabus_data_{faculty}.csv")
-        win_file = os.path.join(win_dir, f"syllabus_data_{faculty}.csv")
+        log(f"{faculty} をフォーマットしています。")
+        row_file = os.path.join(row_detail_dir, f"{faculty}_raw_syllabus_data.csv")
+        mac_file = os.path.join(mac_dir, f"{faculty}_科目ノートの素.csv")
+        win_file = os.path.join(win_dir, f"{faculty}_科目ノートの素.csv")
         
         format_syllabus_data(row_file, mac_file)
         convert_to_utf8_sig(mac_file, win_file)
 
-    log(f"Total Execution Time {time.time() - start_time:.6f} seconds")
-    log("==========Scraping completed==========")
+    log(f"総実行時間: {time.time() - start_time:.6f} 秒")
+    log("==========スクレイピング完了==========")
     
 
 if __name__ == "__main__":
