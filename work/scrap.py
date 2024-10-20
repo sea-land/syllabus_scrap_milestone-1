@@ -255,7 +255,7 @@ def add_details(driver, faculty, row_dir, row_detail_dir):
             writer.writerow(read_row)
             total_elements+=1
 
-        log(f"{total_elements}/{len(rows)-1}件完了")
+        log(f"{total_elements}/{len(rows)-1}件完了\n")
 
 
 
@@ -366,6 +366,57 @@ def format_syllabus_data(faculty, row_detail_dir, formatted_data):
         log(f"Unexpected error: {e}", ERROR)
 
 
+def expand_timetable(row):
+    timetable = row[TIMETABLE]
+    common_data1 = row[:TIMETABLE]
+    common_data2 = row[MODALITY_CATEGORIES:]
+    time_data = []
+    expanded_rows = []
+
+    if ":" in timetable:
+        time = timetable.split(":")
+        for timetable in time[1:]:
+            timetable, week, period = split_clss_date(timetable)
+            time_data=[timetable, week, period]
+            expanded_rows.append(common_data1 + time_data + common_data2)
+    else:
+        time_data=[timetable, timetable[0], timetable[1]]
+        expanded_rows.append(common_data1 + time_data + common_data2)
+    return expanded_rows
+
+
+def create_subject_data(faculty, row_detail_dir, formatted_data):
+    """
+    Format the syllabus data by converting it to half-width characters, 
+    generating furigana, adjusting teacher names, and more.
+
+    :param src_path: Path to the source CSV file.
+    :param dest_path: Path to the destination CSV file.
+    """
+    log(f"{FACULTIES_MAP[faculty]} の科目データを作成しています。")
+    src_path = os.path.join(row_detail_dir, f"{FACULTIES_MAP[faculty]}_科目ノートの素.csv")
+    dest_path = os.path.join(formatted_data, f"{FACULTIES_MAP[faculty]}_科目データ.csv")
+
+    try:
+        with open(src_path, "r", newline="", encoding="utf-8-sig") as source, \
+             open(dest_path, "w", newline="", encoding="utf-8-sig") as dest:
+            reader = csv.reader(source)
+            writer = csv.writer(dest)
+            writer.writerow(HEADER)
+            rows = list(reader)
+            for row in rows[1:]:
+                try:
+                    expanded_row = expand_timetable(row)
+                    for final_row in expanded_row:
+                        writer.writerow(final_row)
+                except Exception as e:
+                    log(f"Error processing row: {row} - {e}", ERROR)
+    except IOError as e:
+        log(f"File I/O error: {e}", ERROR)
+    except Exception as e:
+        log(f"Unexpected error: {e}", ERROR)
+
+
 def run():
     log_dir = f"./log"
     if os.path.exists(log_dir):
@@ -381,6 +432,7 @@ def run():
     row_dir = os.path.join(base_dir, "rowData")
     row_detail_dir = os.path.join(base_dir, "rowData_added_detail")
     formatted_dir = os.path.join(base_dir, "科目ノートの素")
+    subject_data_dir =os.path.join(base_dir, "科目データ")
 
     # フォルダの中身を削除
     if os.path.exists(row_dir):
@@ -389,21 +441,23 @@ def run():
         shutil.rmtree(row_detail_dir)
     if os.path.exists(formatted_dir):
         shutil.rmtree(formatted_dir)
+    if os.path.exists(subject_data_dir):
+        shutil.rmtree(subject_data_dir)
 
     # 必要なフォルダを再作成
     os.makedirs(row_dir, exist_ok=True)
     os.makedirs(row_detail_dir, exist_ok=True)
     os.makedirs(formatted_dir, exist_ok=True)
+    os.makedirs(subject_data_dir, exist_ok=True)
 
     try:
         for faculty in FACULTIES:
             scrape_syllabus_data(driver, faculty, row_dir)
             add_details(driver, faculty, row_dir, row_detail_dir)
+            format_syllabus_data(faculty, row_detail_dir, formatted_dir)
+            create_subject_data(faculty, formatted_dir, subject_data_dir)
     finally:
         driver.quit()
-
-    for faculty in FACULTIES:
-        format_syllabus_data(faculty, row_detail_dir, formatted_dir)
 
     # 処理が終了した後にフォルダを削除
     shutil.rmtree(row_dir)
