@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
 from mojimoji import zen_to_han
 from bs4 import BeautifulSoup
-from work.constants import *
+from constants import *
 
 def set_logger():
     """
@@ -66,8 +66,9 @@ def init_driver():
     Returns:
         WebDriverインスタンス。
     """
+
     options = Options()
-    options.add_argument("--headless")  # ヘッドレスモードで実行
+    # options.add_argument("--headless")  # ヘッドレスモードで実行
     options.add_argument("--disable-gpu")  # GPUの無効化
     options.add_argument("--no-sandbox")  # サンドボックスを無効化
     options.add_argument("--disable-dev-shm-usage")  # /dev/shmの使用を無効化
@@ -83,6 +84,7 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
         dest_dir: データ保存先ディレクトリ。
     """
     log(f"{FACULTIES_MAP[faculty]} のシラバスにアクセスしています。")
+    start_time = time.time()
     dest_path = os.path.join(dest_dir, f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv")
 
     driver.get("https://www.wsl.waseda.jp/syllabus/JAA101.php")
@@ -91,15 +93,15 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
 
     # 表示数変更
     driver.execute_script("func_search('JAA103SubCon');")
-    driver.execute_script("func_showchg('JAA103SubCon', '2000');")
+    driver.execute_script("func_showchg('JAA103SubCon', '1000');")
     log(f"{faculty} の科目インデックスを取得中です。")
-    start_time = time.time()
     total_elements = 0
 
     with open(dest_path, "w", newline="", encoding="utf-8-sig") as dest:
-        writer=csv.writer(dest)
+        writer = csv.writer(dest)
         writer.writerow(HEADER)
         total_elements = 0
+
         while True:
             try:
                 soup = BeautifulSoup(driver.page_source, "html.parser")
@@ -133,6 +135,7 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
 
                 # 次のページへ
                 driver.find_element(By.XPATH, "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a").click()
+                time.sleep(2)
             except NoSuchElementException:
                 break
 
@@ -171,16 +174,9 @@ def add_details(driver, faculty, row_dir, row_detail_dir):
                 except IndexError:
                     return ""
             read_row = row
-            # 各フィールドのデータ取得
-            # read_row[YEAR] = safe_get(table_data, 0, 1)
-            # read_row[FACULTY] = faculty
-            # read_row[SUBJECT] = safe_get(table_data, 1, 1)
-            # read_row[TEACHER] = safe_get(table_data, 2, 1)
-            # read_row[TIMETABLE] = safe_get(table_data, 3, 1)
             read_row[CATEGORY] = safe_get(table_data, 4, 1)
             read_row[SCHOOL_YEAR] = safe_get(table_data, 4, 3)
             read_row[UNITS] = safe_get(table_data, 4, 5)
-            # room = safe_get(5,1)
             read_row[CAMPUS] = safe_get(table_data, 5, 3)
             read_row[SUBJECT_KEY] = safe_get(table_data, 6, 1)
             read_row[SUBJECT_CLASS] = safe_get(table_data, 6, 3)
@@ -331,7 +327,7 @@ def create_subject_data(faculty, row_detail_dir, formatted_data):
     :param src_path: Path to the source CSV file.
     :param dest_path: Path to the destination CSV file.
     """
-    log(f"{FACULTIES_MAP[faculty]} の科目データを作成しています。")
+    log(f"{FACULTIES_MAP[faculty]} の科目データを作成しています。\n")
     src_path = os.path.join(row_detail_dir, f"{FACULTIES_MAP[faculty]}_科目ノートの素.csv")
     dest_path = os.path.join(formatted_data, f"{FACULTIES_MAP[faculty]}_科目データ.csv")
 
@@ -391,9 +387,11 @@ def run():
     try:
         for faculty in FACULTIES:
             scrape_syllabus_data(driver, faculty, row_dir)
+        for faculty in FACULTIES:
             add_details(driver, faculty, row_dir, row_detail_dir)
             format_syllabus_data(faculty, row_detail_dir, formatted_dir)
             create_subject_data(faculty, formatted_dir, subject_data_dir)
+
     finally:
         driver.quit()
 

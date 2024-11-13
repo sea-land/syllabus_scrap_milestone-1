@@ -46,9 +46,10 @@ README.md		docker-compose.yml   py_context		work
 
 1. そのまま 以下のコマンドを実行します。
    ```bash
-   docker-compose up --build
+   start "http://localhost:7900/?autoconnect=1&resize=scale&password=secret";docker-compose up --build
    ```
-2. これでスクレイピングは開始されました。通信状況や大学のサーバーの理由により一時読み込みに時間がかかりフリーズすることがありますが気長に待ちましょう。
+2. これにより、デフォルトのブラウザに VNC が起動します。これでスクレイピングは開始されました。
+3. 開いて 5 秒後くらいに Connect ボタンを押すと実際にスクレイピングをしている様子が見られます。通信状況や大学のサーバーの理由により一時読み込みに時間がかかりフリーズすることがありますが気長に待ちましょう。
 
 ### 5. `app.txt`のログを確認
 
