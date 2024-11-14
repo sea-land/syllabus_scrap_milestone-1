@@ -77,6 +77,7 @@ def init_driver():
     options = Options()
     # options.add_argument("--headless")  # ヘッドレスモードで実行
     options.add_argument("--disable-gpu")  # GPUの無効化
+    options.add_argument("--disable-cache")  # キャッシュを無効にする
     # options.add_argument("--no-sandbox")  # サンドボックスを無効化
     options.add_argument("--disable-dev-shm-usage")  # /dev/shmの使用を無効化
     # options.add_argument("--verbose")  # 詳細なログを出力
@@ -157,7 +158,7 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
         log(f"総科目数: {total_elements} 実行時間: {time.time() - start_time:.6f} 秒\n")
 
 
-def add_details(driver, faculty, row_dir, row_detail_dir):
+def add_details(faculty, row_dir, row_detail_dir):
     log(f"{FACULTIES_MAP[faculty]} の詳細情報を追加します。")
     src_path = os.path.join(row_dir,
                             f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv")
@@ -171,7 +172,11 @@ def add_details(driver, faculty, row_dir, row_detail_dir):
         writer.writerow(HEADER)
         rows = list(reader)
         total_elements = 0
+        driver = init_driver()
         for row in rows[1:]:
+            if total_elements % 100 == 0:
+                driver.quit()
+                driver = init_driver()
             if (total_elements % 100 == 0):
                 log(f"{total_elements}/{len(rows)-1}件完了(100件完了ごとに更新されます)")
             detail_url = row[URL]
@@ -384,7 +389,6 @@ def run():
     set_logger()
     log("==========スクレイピング開始============")
     start_time = time.time()
-    driver = init_driver()
 
     year, month = get_current_date()
     base_dir = f"../data/{year}_{month}"
@@ -398,16 +402,15 @@ def run():
     os.makedirs(formatted_dir, exist_ok=True)
     os.makedirs(subject_data_dir, exist_ok=True)
 
-    try:
-        for faculty in FACULTIES:
-            scrape_syllabus_data(driver, faculty, row_dir)
-        for faculty in FACULTIES:
-            add_details(driver, faculty, row_dir, row_detail_dir)
-            format_syllabus_data(faculty, row_detail_dir, formatted_dir)
-            create_subject_data(faculty, formatted_dir, subject_data_dir)
+    driver = init_driver()
+    for faculty in FACULTIES:
+        scrape_syllabus_data(driver, faculty, row_dir)
+    driver.quit()
 
-    finally:
-        driver.quit()
+    for faculty in FACULTIES:
+        add_details(faculty, row_dir, row_detail_dir)
+        format_syllabus_data(faculty, row_detail_dir, formatted_dir)
+        create_subject_data(faculty, formatted_dir, subject_data_dir)
 
     log(f"総実行時間: {time.time() - start_time:.6f} 秒")
     log("==========スクレイピング完了==========")
