@@ -174,10 +174,9 @@ def add_details(faculty, row_dir, row_detail_dir):
         total_elements = 0
         driver = init_driver()
         for row in rows[1:]:
-            if total_elements % 100 == 0:
+            if (total_elements % 100 == 0):
                 driver.quit()
                 driver = init_driver()
-            if (total_elements % 100 == 0):
                 log(f"{total_elements}/{len(rows)-1}件完了(100件完了ごとに更新されます)")
             detail_url = row[URL]
 
@@ -212,6 +211,7 @@ def add_details(faculty, row_dir, row_detail_dir):
             total_elements += 1
 
         log(f"{total_elements}/{len(rows)-1}件完了\n")
+    driver.quit()
 
 
 def get_furigana(text):
