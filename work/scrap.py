@@ -287,15 +287,22 @@ def format_syllabus_data(faculty, row_detail_dir, formatted_data):
 
             for row in rows[1:]:
                 try:
-                    row[SUBJECT_KANA] = get_furigana(
-                        row[SUBJECT]) if row[SUBJECT] else ""
-                    row[TEACHER] = format_teacher_name(
-                        row[TEACHER]) if row[TEACHER] else ""
-                    row[TEACHER_KANA] = get_furigana(
-                        row[TEACHER]) if row[TEACHER] else ""
                     han_row = [
                         zen_to_han(cell, kana=False) if cell else ""
                         for cell in row
+                    ]
+
+                    han_row[SUBJECT_KANA] = get_furigana(
+                        row[SUBJECT]) if han_row[SUBJECT] else ""
+                    han_row[TEACHER] = format_teacher_name(
+                        row[TEACHER]) if han_row[TEACHER] else ""
+                    han_row[TEACHER_KANA] = get_furigana(
+                        row[TEACHER]) if han_row[TEACHER] else ""
+
+                    # フリガナを付けてからもう一度半角変換
+                    han_row = [
+                        zen_to_han(cell, kana=False) if cell else ""
+                        for cell in han_row
                     ]
                     writer.writerow(han_row)
                 except Exception as e:
