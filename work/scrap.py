@@ -225,9 +225,9 @@ def get_furigana(text):
         ふりがな付きのテキスト。
     """
     tagger = Tagger()
-    furigana = " ".join(word.feature.kana or word.surface
-                        for word in tagger(text))
-    return furigana
+    furigana = "".join(word.feature.kana if word.feature.kana else word.surface
+                       for word in tagger(text))
+    return " ".join(furigana.split())
 
 
 def format_teacher_name(name):
