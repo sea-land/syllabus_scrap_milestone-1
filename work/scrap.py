@@ -380,8 +380,6 @@ def create_subject_data(faculty, row_detail_dir, formatted_data):
 
 def run():
     log_dir = f"./log"
-    if os.path.exists(log_dir):
-        shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
     set_logger()
     log("==========スクレイピング開始============")
@@ -395,17 +393,6 @@ def run():
     formatted_dir = os.path.join(base_dir, "科目ノートの素")
     subject_data_dir = os.path.join(base_dir, "科目データ")
 
-    # フォルダの中身を削除
-    if os.path.exists(row_dir):
-        shutil.rmtree(row_dir)
-    if os.path.exists(row_detail_dir):
-        shutil.rmtree(row_detail_dir)
-    if os.path.exists(formatted_dir):
-        shutil.rmtree(formatted_dir)
-    if os.path.exists(subject_data_dir):
-        shutil.rmtree(subject_data_dir)
-
-    # 必要なフォルダを再作成
     os.makedirs(row_dir, exist_ok=True)
     os.makedirs(row_detail_dir, exist_ok=True)
     os.makedirs(formatted_dir, exist_ok=True)
@@ -421,10 +408,6 @@ def run():
 
     finally:
         driver.quit()
-
-    # 処理が終了した後にフォルダを削除
-    shutil.rmtree(row_dir)
-    shutil.rmtree(row_detail_dir)
 
     log(f"総実行時間: {time.time() - start_time:.6f} 秒")
     log("==========スクレイピング完了==========")
