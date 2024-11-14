@@ -22,7 +22,7 @@ def set_logger():
     ログを設定する関数。
     ログをファイルに書き出し、ログが100KB溜まったら新しいファイルを作成。
     """
-    log_file = "./log/app.txt"
+    log_file = "./log/app.log"
 
     logger = getLogger()
     logger.setLevel(DEBUG)
@@ -94,9 +94,8 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
     """
     log(f"{FACULTIES_MAP[faculty]} のシラバスにアクセスしています。")
     start_time = time.time()
-    file_name=f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv"
-    dest_path = os.path.join(
-        dest_dir, file_name)
+    file_name = f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv"
+    dest_path = os.path.join(dest_dir, file_name)
 
     driver.get(SYLLABUS_URL)
     select = Select(driver.find_element(By.NAME, "p_gakubu"))
@@ -126,12 +125,10 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
                     cols = row.find_all("td")
                     read_row[FACULTY] = faculty
                     read_row[YEAR] = cols[0].text.strip()
-                    read_row[COURSE_CODE] = cols[1].text.strip()
                     read_row[SUBJECT] = cols[2].text.strip()
                     read_row[TEACHER] = cols[3].text.strip()
                     read_row[SEMESTER] = cols[5].text.strip()
                     read_row[TIMETABLE] = cols[6].text.strip()
-                    read_row[ROOM] = cols[7].text.strip()
                     read_row[DESCRIPTION] = remove_newlines(
                         cols[8].text.strip())
 
@@ -202,11 +199,8 @@ def add_details(driver, faculty, row_dir, row_detail_dir):
             read_row[SCHOOL_YEAR] = safe_get(table_data, 4, 3)
             read_row[UNITS] = safe_get(table_data, 4, 5)
             read_row[CAMPUS] = safe_get(table_data, 5, 3)
-            read_row[SUBJECT_KEY] = safe_get(table_data, 6, 1)
-            read_row[SUBJECT_CLASS] = safe_get(table_data, 6, 3)
             read_row[LANGUAGE] = safe_get(table_data, 7, 1)
             read_row[MODALITY_CATEGORIES] = safe_get(table_data, 8, 1)
-            read_row[LEVEL] = safe_get(table_data, 13, 1)
             read_row[TYPE] = safe_get(table_data, 13, 3)
 
             writer.writerow(read_row)
@@ -229,25 +223,6 @@ def get_furigana(text):
     furigana = " ".join(word.feature.kana or word.surface
                         for word in tagger(text))
     return furigana
-
-
-def get_class_type(code):
-    """
-    コードに基づいて授業形式を取得する関数。
-
-    Args:
-        code: 授業コード。
-    
-    Returns:
-        授業形式の文字列。
-
-    Raises:
-        ValueError: コードが空の場合に発生。
-    """
-    if not code:
-        raise ValueError("授業コードが空です。")
-
-    return CLASS_TYPE_MAP.get(code[-1], "不明")
 
 
 def format_teacher_name(name):
@@ -312,22 +287,16 @@ def format_syllabus_data(faculty, row_detail_dir, formatted_data):
 
             for row in rows[1:]:
                 try:
+                    row[SUBJECT_KANA] = get_furigana(
+                        row[SUBJECT]) if row[SUBJECT] else ""
+                    row[TEACHER] = format_teacher_name(
+                        row[TEACHER]) if row[TEACHER] else ""
+                    row[TEACHER_KANA] = get_furigana(
+                        row[TEACHER]) if row[TEACHER] else ""
                     han_row = [
                         zen_to_han(cell, kana=False) if cell else ""
                         for cell in row
                     ]
-                    han_row[SUBJECT_KANA] = get_furigana(
-                        han_row[SUBJECT]) if han_row[SUBJECT] else ""
-                    han_row[TEACHER] = format_teacher_name(
-                        han_row[TEACHER]) if han_row[TEACHER] else ""
-                    han_row[TEACHER_KANA] = get_furigana(
-                        han_row[TEACHER]) if han_row[TEACHER] else ""
-                    han_row[TIMETABLE], han_row[WEEK], han_row[
-                        PERIOD] = split_clss_date(
-                            han_row[TIMETABLE]
-                        ) if han_row[TIMETABLE] else "" "" ""
-                    han_row[TYPE] = get_class_type(
-                        han_row[COURSE_CODE]) if han_row[COURSE_CODE] else ""
                     writer.writerow(han_row)
                 except Exception as e:
                     log(f"{row}行目でエラー: {e}", ERROR)
@@ -375,14 +344,26 @@ def create_subject_data(faculty, row_detail_dir, formatted_data):
              open(dest_path, "w", newline="", encoding="utf-8-sig") as dest:
             reader = csv.reader(source)
             writer = csv.writer(dest)
-            writer.writerow(HEADER)
+
+            # ヘッダー行の書き込み
+            writer.writerow(SUBJECT_DATA_HEADER)
+
+            # 全行の読み込み
             rows = list(reader)
+
+            # ヘッダー行から必要な列のインデックスを取得
+            headers = rows[0]
+            col_indices = [headers.index(col) for col in SUBJECT_DATA_HEADER]
+
             for row in rows[1:]:
                 try:
-                    expanded_row = expand_timetable(row)
-                    for final_row in expanded_row:
-                        writer.writerow(final_row)
-                except Exception as e:
+                    expanded_rows = expand_timetable(row)
+                    for expanded_row in expanded_rows:
+                        selected_row = [
+                            expanded_row[index] for index in col_indices
+                        ]
+                        writer.writerow(selected_row)
+                except IndexError as e:
                     log(f"Error processing row: {row} - {e}", ERROR)
     except IOError as e:
         log(f"File I/O error: {e}", ERROR)
