@@ -1,20 +1,28 @@
 services:
-  selenium:               # selenium container
+  selenium:
+    # selenium container
     platform: linux/x86_64
-    image: selenium/standalone-chrome:latest # docker hubのselenium公式イメージ
-    shm_size: 2gb         # ホストとメモリを共有するために設定
+    # image: selenium/standalone-chrome:129.0 # docker hubのselenium公式イメージ
+    image: seleniarm/standalone-chromium # M1 Mac など ARM で動作する環境では、こちらののイメージを使います。
+    shm_size: 2gb # ホストとメモリを共有するために設定
     ports:
-      - 4444:4444         # selenium sever port
-      - 7900:7900         # 実行中のChromeを確認するVNC用port
+      - 4444:4444 # selenium sever port
+      - 7900:7900 # 実行中のChromeを確認するVNC用port
     volumes:
       - /dev/shm:/dev/shm
-  
-  scraping:                 # python container
+    environment:
+      - OTEL_SDK_DISABLED=true
+
+  scraping:
+    # python container
     platform: linux/x86_64
-    build: ./py_context   # python3のbuild contextを指定
+    build: ./py_context # python3のbuild contextを指定
     volumes:
-      - ./work:/work      # ローカルの"./work"とコンテナの"/work"をバインド
-      - ./data:/data      # ローカルの"./data"とコンテナの"/data"をバインド
-    tty: true             # ターミナル入力を受け付ける
-    depends_on:           # seleniumコンテナの後で起動させるように指定
-      - selenium
+      - ./work:/work # ローカルの"./work"とコンテナの"/work"をバインド
+      - ./data:/data # ローカルの"./data"とコンテナの"/data"をバインド
+    tty: true # ターミナル入力を受け付ける
+    depends_on:
+      - selenium # seleniumコンテナの後で起動させるように指定
+    environment:
+      - SELENIUM_URL=http://selenium:4444/wd/hub
+      - OTEL_SDK_DISABLED=true
