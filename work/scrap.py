@@ -17,11 +17,9 @@ from bs4 import BeautifulSoup
 from constants import *
 
 
+# ログを設定する関数。
+# ログをファイルに書き出し、ログが100KB溜まったら新しいファイルを作成。
 def set_logger():
-    """
-    ログを設定する関数。
-    ログをファイルに書き出し、ログが100KB溜まったら新しいファイルを作成。
-    """
     log_file = "./log/app.log"
 
     logger = getLogger()
@@ -40,14 +38,8 @@ def set_logger():
     main_logger.setLevel(DEBUG)
 
 
+    # ログを出力するための関数。
 def log(arg, level=DEBUG):
-    """
-    ログを出力するための関数。
-    
-    Args:
-        arg: ログメッセージ。
-        level: ログレベル。
-    """
     logger = getLogger(__name__)
     if level == DEBUG:
         logger.debug(arg)
@@ -55,44 +47,24 @@ def log(arg, level=DEBUG):
         logger.error(arg)
 
 
-def get_current_date():
-    """
-    現在の年と月を取得する関数。
-    
-    Returns:
-        現在の年と月。
-    """
-    now = datetime.datetime.now()
-    return now.year, now.month
-
-
+    # Chrome WebDriverを初期化する関数。
 def init_driver():
-    """
-    Chrome WebDriverを初期化する関数。
-    
-    Returns:
-        WebDriverインスタンス。
-    """
-
+    selenium_url = "http://selenium:4444/wd/hub"
     options = Options()
     # options.add_argument("--headless")  # ヘッドレスモードで実行
     options.add_argument("--disable-gpu")  # GPUの無効化
     options.add_argument("--disable-cache")  # キャッシュを無効にする
-    # options.add_argument("--no-sandbox")  # サンドボックスを無効化
+    options.add_argument("--no-sandbox")  # サンドボックスを無効化
     options.add_argument("--disable-dev-shm-usage")  # /dev/shmの使用を無効化
     # options.add_argument("--verbose")  # 詳細なログを出力
-    return webdriver.Remote(command_executor="http://selenium:4444/wd/hub",
-                            options=options)
+    options.add_argument("--start-maximized")  # ブラウザを最大化
+    options.add_argument("--disable-infobars")  # 情報バーを無効化
+    options.add_argument("--disable-extensions")  # 拡張機能を無効化
+    return webdriver.Remote(command_executor=selenium_url, options=options)
 
 
+    # シラバスデータをスクレイピングしてCSVファイルに保存する関数。
 def scrape_syllabus_data(driver, faculty, dest_dir):
-    """
-    シラバスデータをスクレイピングしてCSVファイルに保存する関数。
-
-    Args:
-        driver: WebDriverインスタンス。
-        dest_dir: データ保存先ディレクトリ。
-    """
     log(f"{FACULTIES_MAP[faculty]} のシラバスにアクセスしています。")
     start_time = time.time()
     file_name = f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv"
@@ -104,18 +76,18 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
 
     # 表示数変更
     driver.execute_script("func_search('JAA103SubCon');")
-    driver.execute_script("func_showchg('JAA103SubCon', '1000');")
-    log(f"{faculty} の科目インデックスを取得中です。")
+    driver.execute_script("func_showchg('JAA103SubCon', '500');")
+    log(f"{FACULTIES_MAP[faculty]} の科目インデックスを取得中です。")
     total_elements = 0
 
     with open(dest_path, "w", newline="", encoding="utf-8-sig") as dest:
         writer = csv.writer(dest)
         writer.writerow(HEADER)
         total_elements = 0
-
         while True:
             try:
-                soup = BeautifulSoup(driver.page_source, "html.parser")
+                html = driver.page_source.replace("\n", "").replace("\t", "")
+                soup = BeautifulSoup(html, "lxml")
                 rows = soup.select(
                     "#cCommon div div div div div:nth-child(1) div:nth-child(2) table tbody tr"
                 )
@@ -130,8 +102,8 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
                     read_row[TEACHER] = cols[3].text.strip()
                     read_row[SEMESTER] = cols[5].text.strip()
                     read_row[TIMETABLE] = cols[6].text.strip()
-                    read_row[DESCRIPTION] = remove_newlines(
-                        cols[8].text.strip())
+                    read_row[DESCRIPTION] = cols[8].text.strip().replace(
+                        "\n", "/").replace("\r", "/")
 
                     # 科目の詳細ページのリンクを取得
                     link_element = cols[2].find("a", onclick=True)
@@ -151,7 +123,7 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
                     By.XPATH,
                     "//*[@id='cHonbun']/div[2]/table/tbody/tr/td[3]/div/div/p/a"
                 ).click()
-                time.sleep(2)
+                time.sleep(1)
             except NoSuchElementException:
                 break
 
@@ -181,7 +153,8 @@ def add_details(faculty, row_dir, row_detail_dir):
             detail_url = row[URL]
 
             driver.get(detail_url)
-            detail_page = BeautifulSoup(driver.page_source, "html.parser")
+            html = driver.page_source.replace("\n", "").replace("\t", "")
+            detail_page = BeautifulSoup(html, "lxml")
 
             # テーブルのすべての行とセルを2次元リストに変換
             table_data = [[
@@ -215,44 +188,23 @@ def add_details(faculty, row_dir, row_detail_dir):
 
 
 def get_furigana(text):
-    """
-    テキストにふりがなを追加する関数。
-
-    Args:
-        text: テキスト。
-    
-    Returns:
-        ふりがな付きのテキスト。
-    """
     tagger = Tagger()
     furigana = "".join(word.feature.kana if word.feature.kana else word.surface
                        for word in tagger(text))
     return " ".join(furigana.split())
 
 
+    # 教員名のフォーマット関数。
 def format_teacher_name(name):
-    """
-    教員名のフォーマット関数。
-    
-    Args:
-        name: 教員名。
-    
-    Returns:
-        フォーマットされた教員名。
-    """
     # スラッシュの数を数えて、2つ以上の場合は「オムニバス」に変更
     if name.count("/") >= 2:
         return "オムニバス"
 
-    # 全ての名前がカタカナでスペースが含まれている場合、スペースをピリオドに置き換える
+    # 名前が全てカタカナでスペースが含まれている場合、スペースをピリオドに置き換える
     names = name.split("/")
     for i, name in enumerate(names):
         if re.search(r'[ァ-ン]', name):
             names[i] = name.replace(" ", ".")
-
-    # スラッシュの数を数えて、1つの場合は「/」を「･」に置き換える
-    if name.count("/") == 1:
-        name = name.replace("/", "･")
 
     return "･".join(names)
 
@@ -264,22 +216,12 @@ def split_clss_date(date):
         return date, date[0], date[1]
 
 
-def remove_newlines(text):
-    return text.replace("\n", "/").replace("\r", "/")
-
-
-def format_syllabus_data(faculty, row_detail_dir, formatted_data):
-    """
-    Format the syllabus data by converting it to half-width characters, 
-    generating furigana, adjusting teacher names, and more.
-
-    :param src_path: Path to the source CSV file.
-    :param dest_path: Path to the destination CSV file.
-    """
-    log(f"{FACULTIES_MAP[faculty]} をフォーマットしています。")
+# 科目ノートを作成する関数
+def create_subject_note(faculty, row_detail_dir, subject_note_dir):
+    log(f"{FACULTIES_MAP[faculty]} の科目ノートを作成しています。")
     src_path = os.path.join(row_detail_dir,
                             f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv")
-    dest_path = os.path.join(formatted_data,
+    dest_path = os.path.join(subject_note_dir,
                              f"{FACULTIES_MAP[faculty]}_科目ノートの素.csv")
 
     try:
@@ -298,11 +240,11 @@ def format_syllabus_data(faculty, row_detail_dir, formatted_data):
                     ]
 
                     han_row[SUBJECT_KANA] = get_furigana(
-                        row[SUBJECT]) if han_row[SUBJECT] else ""
+                        han_row[SUBJECT]) if han_row[SUBJECT] else ""
                     han_row[TEACHER] = format_teacher_name(
-                        row[TEACHER]) if han_row[TEACHER] else ""
+                        han_row[TEACHER]) if han_row[TEACHER] else ""
                     han_row[TEACHER_KANA] = get_furigana(
-                        row[TEACHER]) if han_row[TEACHER] else ""
+                        han_row[TEACHER]) if han_row[TEACHER] else ""
 
                     # フリガナを付けてからもう一度半角変換
                     han_row = [
@@ -311,7 +253,8 @@ def format_syllabus_data(faculty, row_detail_dir, formatted_data):
                     ]
                     writer.writerow(han_row)
                 except Exception as e:
-                    log(f"{row}行目でエラー: {e}", ERROR)
+                    log(f"Error processing row(subject_note): {row} - {e}",
+                        ERROR)
     except IOError as e:
         log(f"File I/O error: {e}", ERROR)
     except Exception as e:
@@ -337,18 +280,12 @@ def expand_timetable(row):
     return expanded_rows
 
 
-def create_subject_data(faculty, row_detail_dir, formatted_data):
-    """
-    Format the syllabus data by converting it to half-width characters, 
-    generating furigana, adjusting teacher names, and more.
-
-    :param src_path: Path to the source CSV file.
-    :param dest_path: Path to the destination CSV file.
-    """
+# 科目データを作成する関数
+def create_subject_data(faculty, subject_note_dir, subject_data_dir):
     log(f"{FACULTIES_MAP[faculty]} の科目データを作成しています。\n")
-    src_path = os.path.join(row_detail_dir,
+    src_path = os.path.join(subject_note_dir,
                             f"{FACULTIES_MAP[faculty]}_科目ノートの素.csv")
-    dest_path = os.path.join(formatted_data,
+    dest_path = os.path.join(subject_data_dir,
                              f"{FACULTIES_MAP[faculty]}_科目データ.csv")
 
     try:
@@ -365,18 +302,19 @@ def create_subject_data(faculty, row_detail_dir, formatted_data):
 
             # ヘッダー行から必要な列のインデックスを取得
             headers = rows[0]
-            col_indices = [headers.index(col) for col in SUBJECT_DATA_HEADER]
+            col_indexes = [headers.index(col) for col in SUBJECT_DATA_HEADER]
 
             for row in rows[1:]:
                 try:
                     expanded_rows = expand_timetable(row)
                     for expanded_row in expanded_rows:
                         selected_row = [
-                            expanded_row[index] for index in col_indices
+                            expanded_row[index] for index in col_indexes
                         ]
                         writer.writerow(selected_row)
                 except IndexError as e:
-                    log(f"Error processing row: {row} - {e}", ERROR)
+                    log(f"Error processing row(subject_data): {row} - {e}",
+                        ERROR)
     except IOError as e:
         log(f"File I/O error: {e}", ERROR)
     except Exception as e:
@@ -390,16 +328,16 @@ def run():
     log("==========スクレイピング開始============")
     start_time = time.time()
 
-    year, month = get_current_date()
-    base_dir = f"../data/{year}_{month}"
-    row_dir = os.path.join(base_dir, "rowData")
-    row_detail_dir = os.path.join(base_dir, "rowData_added_detail")
-    formatted_dir = os.path.join(base_dir, "科目ノートの素")
-    subject_data_dir = os.path.join(base_dir, "科目データ")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    base_dir = f"../data/{timestamp}"
+    row_dir = os.path.join(base_dir, "01rowData")
+    row_detail_dir = os.path.join(base_dir, "01rowData_added_detail")
+    subject_note_dir = os.path.join(base_dir, "02科目ノートの素")
+    subject_data_dir = os.path.join(base_dir, "03科目データ")
 
     os.makedirs(row_dir, exist_ok=True)
     os.makedirs(row_detail_dir, exist_ok=True)
-    os.makedirs(formatted_dir, exist_ok=True)
+    os.makedirs(subject_note_dir, exist_ok=True)
     os.makedirs(subject_data_dir, exist_ok=True)
 
     driver = init_driver()
@@ -409,8 +347,8 @@ def run():
 
     for faculty in FACULTIES:
         add_details(faculty, row_dir, row_detail_dir)
-        format_syllabus_data(faculty, row_detail_dir, formatted_dir)
-        create_subject_data(faculty, formatted_dir, subject_data_dir)
+        create_subject_note(faculty, row_detail_dir, subject_note_dir)
+        create_subject_data(faculty, subject_note_dir, subject_data_dir)
 
     log(f"総実行時間: {time.time() - start_time:.6f} 秒")
     log("==========スクレイピング完了==========")

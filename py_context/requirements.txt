@@ -1,4 +1,6 @@
 selenium
 mojimoji
 bs4
+lxml
 fugashi[unidic-lite]
+selenium==4.25.0
