@@ -132,35 +132,44 @@ def scrape_syllabus_data(driver, faculty, dest_dir):
 
 def add_details(faculty, row_dir, row_detail_dir):
     log(f"{FACULTIES_MAP[faculty]} の詳細情報を追加します。")
+
     src_path = os.path.join(row_dir,
                             f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv")
     dest_path = os.path.join(
         row_detail_dir, f"{FACULTIES_MAP[faculty]}_raw_syllabus_data.csv")
 
+    start_time = time.time()
+
     with open(src_path, "r", newline="", encoding="utf-8-sig") as source, \
          open(dest_path, "w", newline="", encoding="utf-8-sig") as dest:
+
         reader = csv.reader(source)
         writer = csv.writer(dest)
         writer.writerow(HEADER)
         rows = list(reader)
+
         total_elements = 0
         driver = init_driver()
+
         for row in rows[1:]:
-            if (total_elements % 100 == 0):
+            if total_elements % 100 == 0:
                 driver.quit()
                 driver = init_driver()
-                log(f"{total_elements}/{len(rows)-1}件完了(100件完了ごとに更新されます)")
+
+                elapsed = time.time() - start_time
+                log(f"{total_elements}/{len(rows)-1}件完了 "
+                    f"(100件ごと更新) | 経過時間: {elapsed:.2f} 秒")
+
             detail_url = row[URL]
 
             driver.get(detail_url)
             html = driver.page_source.replace("\n", "").replace("\t", "")
             detail_page = BeautifulSoup(html, "lxml")
 
-            # テーブルのすべての行とセルを2次元リストに変換
+            # テーブル → 2次元配列
             table_data = [[
-                cell.get_text(strip=True)
-                for cell in row.find_all(['td', 'th'])
-            ] for row in detail_page.select(
+                cell.get_text(strip=True) for cell in tr.find_all(['td', 'th'])
+            ] for tr in detail_page.select(
                 "#cEdit > div:nth-child(1) > div > div > div > div > div.ctable-main > table > tbody > tr"
             )]
 
@@ -183,7 +192,10 @@ def add_details(faculty, row_dir, row_detail_dir):
             writer.writerow(read_row)
             total_elements += 1
 
-        log(f"{total_elements}/{len(rows)-1}件完了\n")
+        total_elapsed = time.time() - start_time
+        log(f"{total_elements}/{len(rows)-1}件完了 "
+            f"| 総実行時間: {total_elapsed:.2f} 秒\n")
+
     driver.quit()
 
 
